@@ -109,9 +109,9 @@ router.post("/:password/delete-user/:id", (req, res) => {
     // 1. Tạm thời tắt kiểm tra khóa ngoại để dọn dẹp dữ liệu liên quan mà không bị chặn
     db.prepare("PRAGMA foreign_keys = OFF").run();
 
-    // 2. Thực hiện xóa dữ liệu liên chuỗi ở tất cả các bảng liên quan
+    // 2. Thực hiện xóa dữ liệu liên chuỗi (Đã xóa bỏ cột ownerId bị lỗi)
     db.prepare("DELETE FROM cross_logs WHERE actor_id = ?").run(id);
-    db.prepare("DELETE FROM tasks WHERE owner_id = ? OR ownerId = ?").run(id, id);
+    db.prepare("DELETE FROM tasks WHERE owner_id = ?").run(id);
     db.prepare("DELETE FROM users WHERE id = ?").run(id);
 
     // 3. Kích hoạt lại kiểm tra khóa ngoại để bảo toàn tính toàn vẹn của DB
