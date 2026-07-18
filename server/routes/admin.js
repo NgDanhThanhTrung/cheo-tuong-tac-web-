@@ -20,7 +20,7 @@ router.get("/:password", (req, res) => {
   }
 
   try {
-    // SỬA TẠI ĐÂY: Dùng SELECT * để tránh lỗi nếu database thiếu cột label/username/phone
+    // Dùng SELECT * để tránh lỗi nếu database thiếu cột label/username/phone
     const users = db.prepare("SELECT * FROM users ORDER BY id DESC").all();
     const tasks = db.prepare("SELECT * FROM tasks ORDER BY id DESC").all();
 
@@ -106,11 +106,21 @@ router.post("/:password/delete-user/:id", (req, res) => {
   if (password !== ADMIN_PASSWORD) return res.status(403).send("Sai mật khẩu");
 
   try {
+    // 1. Tạm thời tắt kiểm tra khóa ngoại để dọn dẹp dữ liệu liên quan mà không bị chặn
+    db.prepare("PRAGMA foreign_keys = OFF").run();
+
+    // 2. Thực hiện xóa dữ liệu liên chuỗi ở tất cả các bảng liên quan
     db.prepare("DELETE FROM cross_logs WHERE actor_id = ?").run(id);
-    db.prepare("DELETE FROM tasks WHERE owner_id = ?").run(id);
+    db.prepare("DELETE FROM tasks WHERE owner_id = ? OR ownerId = ?").run(id, id);
     db.prepare("DELETE FROM users WHERE id = ?").run(id);
+
+    // 3. Kích hoạt lại kiểm tra khóa ngoại để bảo toàn tính toàn vẹn của DB
+    db.prepare("PRAGMA foreign_keys = ON").run();
+
     res.redirect(`/admin/${password}`);
   } catch (err) {
+    // Đảm bảo khóa ngoại luôn được bật lại kể cả khi quá trình xóa thất bại
+    try { db.prepare("PRAGMA foreign_keys = ON").run(); } catch (e) {}
     res.status(500).send(`Lỗi khi xóa user: ${err.message}`);
   }
 });
@@ -121,10 +131,13 @@ router.post("/:password/delete-task/:id", (req, res) => {
   if (password !== ADMIN_PASSWORD) return res.status(403).send("Sai mật khẩu");
 
   try {
+    db.prepare("PRAGMA foreign_keys = OFF").run();
     db.prepare("DELETE FROM cross_logs WHERE task_id = ?").run(id);
     db.prepare("DELETE FROM tasks WHERE id = ?").run(id);
+    db.prepare("PRAGMA foreign_keys = ON").run();
     res.redirect(`/admin/${password}`);
   } catch (err) {
+    try { db.prepare("PRAGMA foreign_keys = ON").run(); } catch (e) {}
     res.status(500).send(`Lỗi khi xóa nhiệm vụ: ${err.message}`);
   }
 });
