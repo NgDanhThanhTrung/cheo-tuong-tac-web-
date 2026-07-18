@@ -4,6 +4,9 @@ export default function TaskList({ owner, tasks, onConfirm }) {
   const [busyId, setBusyId] = useState(null);
 
   async function handleConfirm(taskId) {
+    // Nếu chủ nhiệm vụ là tài khoản ảo, chặn không cho bấm xử lý
+    if (owner?.is_virtual) return; 
+    
     setBusyId(taskId);
     await onConfirm(taskId);
     setBusyId(null);
@@ -40,6 +43,9 @@ export default function TaskList({ owner, tasks, onConfirm }) {
             >
               Đã chéo ✓
             </button>
+          ) : owner?.is_virtual ? (
+            /* Nếu lọt lưới nick ảo xuống frontend, hiển thị trạng thái vô hiệu hóa không cho bấm */
+            <span className="text-xs text-red-500 ml-4 shrink-0">Tài khoản hệ thống</span>
           ) : (
             <button
               onClick={() => handleConfirm(t.id)}
