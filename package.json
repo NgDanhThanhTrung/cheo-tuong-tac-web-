@@ -4,7 +4,7 @@
   "description": "Ung dung quan ly cheo tuong tac nhom cong dong (Full-stack, single Render service)",
   "private": true,
   "engines": {
-    "node": ">=18.x"
+    "node": "20.x"
   },
   "scripts": {
     "install:server": "npm install",
