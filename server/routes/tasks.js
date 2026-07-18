@@ -17,8 +17,8 @@ router.get("/", (req, res) => {
   const ownerId = Number(req.query.ownerId);
   if (!ownerId) return res.status(400).json({ error: "Thieu ownerId." });
 
-  // LỌC Ở ĐÂY: Thêm điều kiện "AND is_virtual = 0" để chặn không cho truy cập nhiệm vụ của nick ảo
-  const owner = db.prepare("SELECT * FROM users WHERE id = ? AND is_virtual = 0").get(ownerId);
+  // ĐÃ SỬA: Gỡ bỏ hoàn toàn điều kiện lọc lỗi để lấy ra tài khoản bình thường
+  const owner = db.prepare("SELECT * FROM users WHERE id = ?").get(ownerId);
   if (!owner) return res.status(404).json({ error: "Khong tim thay thanh vien." });
 
   const tasks = db.prepare("SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC").all(ownerId);
