@@ -6,6 +6,7 @@
 const path = require("path");
 const express = require("express");
 const cors = require("cors");
+const cron = require("node-cron"); // Đã import thêm node-cron
 const db = require("./db");
 
 const authRoutes = require("./routes/auth");
@@ -41,6 +42,30 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/logs", logRoutes);
 
 app.get("/api/health", (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+
+// ---- Tự động dọn dẹp nhiệm vụ lúc 0:00 hàng ngày (Giờ Việt Nam) ----
+cron.schedule("0 0 * * *", () => {
+  console.log(`[${new Date().toISOString()}] Bắt đầu tự động dọn dẹp dữ liệu nhiệm vụ hàng ngày...`);
+  
+  try {
+    // 1. Xóa lịch sử làm nhiệm vụ (cross_logs) để ngày mới mọi người có thể chéo lại từ đầu
+    const deleteLogs = db.prepare("DELETE FROM cross_logs");
+    const logsResult = deleteLogs.run();
+    console.log(`- Đã xóa ${logsResult.changes} bản ghi trong bảng cross_logs.`);
+
+    // 2. Xóa toàn bộ danh sách nhiệm vụ (tasks) hiện tại
+    const deleteTasks = db.prepare("DELETE FROM tasks");
+    const tasksResult = deleteTasks.run();
+    console.log(`- Đã làm sạch ${tasksResult.changes} nhiệm vụ trong bảng tasks.`);
+    
+    console.log("==> Hoàn tất dọn dẹp dữ liệu lúc 0:00!");
+  } catch (error) {
+    console.error("Lỗi xảy ra khi tự động dọn dẹp nhiệm vụ:", error);
+  }
+}, {
+  scheduled: true,
+  timezone: "Asia/Ho_Chi_Minh" // Ép chạy theo múi giờ Việt Nam độc lập với giờ của server Render
+});
 
 // ---- Serve React build (client/dist) ----
 const clientDist = path.join(__dirname, "..", "client", "dist");
