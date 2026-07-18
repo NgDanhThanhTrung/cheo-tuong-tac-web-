@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: cheo-tuong-tac-app
+    env: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 18.20.4
+    # LUU Y: goi free cua Render co dia (disk) tam thoi -> file SQLite se bi xoa moi lan deploy/restart.
+    # Neu can du lieu ton tai lau dai that su, hay:
+    #  1) Them "disk" (Persistent Disk) tra phi cho service nay va tro DB_PATH toi thu muc do, HOAC
+    #  2) Doi sang PostgreSQL (Render co Postgres mien phi 90 ngay / tra phi) va sua server/db.js

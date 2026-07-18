@@ -1,0 +1,22 @@
+{
+  "name": "cheo-tuong-tac-app",
+  "version": "1.0.0",
+  "description": "Ung dung quan ly cheo tuong tac nhom cong dong (Full-stack, single Render service)",
+  "private": true,
+  "engines": {
+    "node": ">=18.x"
+  },
+  "scripts": {
+    "install:server": "npm install",
+    "install:client": "cd client && npm install",
+    "build": "npm run install:server && npm run install:client && cd client && npm run build",
+    "start": "node server/index.js",
+    "dev:server": "node server/index.js",
+    "dev:client": "cd client && npm run dev"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
