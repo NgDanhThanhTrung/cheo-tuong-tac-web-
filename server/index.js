@@ -13,6 +13,7 @@ const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
 const taskRoutes = require("./routes/tasks");
 const logRoutes = require("./routes/logs");
+const adminRoutes = require("./routes/admin"); // 1. IMPORT THÊM ROUTE ADMIN
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -40,6 +41,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/logs", logRoutes);
+app.use("/admin", adminRoutes); // 2. KÍCH HOẠT ĐỊA CHỈ /admin TẠI ĐÂY
 
 app.get("/api/health", (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
