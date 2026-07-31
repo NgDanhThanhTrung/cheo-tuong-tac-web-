@@ -1,30 +1,37 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const db = require('../db');
+const db = require("../db");
 
 // DELETE /api/cron/clear-all-tasks
-router.delete('/clear-all-tasks', (req, res) => {
-  const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
+router.delete("/clear-all-tasks", (req, res) => {
+  const cronSecret = req.headers["x-cron-secret"] || req.query.secret;
 
-  // Xác thực bí mật nếu có cài đặt CRON_SECRET trong môi trường
+  // Xác thực bí mật nếu môi trường có cài đặt CRON_SECRET
   if (process.env.CRON_SECRET && cronSecret !== process.env.CRON_SECRET) {
-    return res.status(403).json({ error: 'Unauthorized: Invalid cron secret' });
+    return res.status(403).json({ error: "Unauthorized: Mã xác thực Cron không hợp lệ" });
   }
 
-  // Xóa toàn bộ dữ liệu trong bảng tasks
-  db.run('DELETE FROM tasks', [], function (err) {
-    if (err) {
-      console.error('[CRON ERROR] Lỗi khi dọn dẹp tasks:', err.message);
-      return res.status(500).json({ error: err.message });
-    }
+  try {
+    // 1. Xóa lịch sử làm nhiệm vụ (cross_logs) để ngày mới mọi người có thể chéo lại từ đầu
+    const deleteLogs = db.prepare("DELETE FROM cross_logs");
+    const logsResult = deleteLogs.run();
 
-    console.log(`[CRON SUCCESS] Đã xóa toàn bộ ${this.changes} tasks.`);
+    // 2. Xóa toàn bộ danh sách nhiệm vụ (tasks) hiện tại
+    const deleteTasks = db.prepare("DELETE FROM tasks");
+    const tasksResult = deleteTasks.run();
+
+    console.log(`[CRON API SUCCESS] Đã xóa ${logsResult.changes} logs và ${tasksResult.changes} tasks.`);
+
     return res.json({
       success: true,
-      message: 'Đã xóa tất cả các link/task thành công.',
-      deletedCount: this.changes
+      message: "Hoàn tất dọn dẹp dữ liệu ngày mới!",
+      deletedLogs: logsResult.changes,
+      deletedTasks: tasksResult.changes,
     });
-  });
+  } catch (error) {
+    console.error("Lỗi xảy ra khi dọn dẹp nhiệm vụ qua API Cron:", error);
+    return res.status(500).json({ error: "Lỗi máy chủ khi dọn dẹp dữ liệu" });
+  }
 });
 
 module.exports = router;
