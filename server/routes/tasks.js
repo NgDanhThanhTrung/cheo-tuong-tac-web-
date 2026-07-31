@@ -3,16 +3,18 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const { User, Task, CrossLog, Report } = require("../models/Schemas");
 
-// 1. Lấy danh sách nhiệm vụ cho User thường (Ẩn những link đã đủ 10 lượt tương tác)
+// 1. Lấy danh sách nhiệm vụ cho User (Ẩn link đã đủ 10 lượt tương tác)
 router.get("/", async (req, res) => {
   try {
-    const currentUserId = req.currentUser ? req.currentUser._id : null;
+    // Chuyển string ID sang ObjectId để so sánh chuẩn xác trong MongoDB Aggregation
+    const currentUserId = req.currentUser
+      ? new mongoose.Types.ObjectId(req.currentUser._id)
+      : null;
 
-    // Aggregation pipeline kiểm tra số lượt tương tác của từng task
     const tasks = await Task.aggregate([
       {
         $lookup: {
-          from: "crosslogs",
+          from: "crosslogs", // Tên collection của CrossLog model trong MongoDB
           localField: "_id",
           foreignField: "task_id",
           as: "interactions"
@@ -26,13 +28,18 @@ router.get("/", async (req, res) => {
           as: "creator"
         }
       },
-      { $unwind: "$creator" },
+      {
+        $unwind: {
+          path: "$creator",
+          preserveNullAndEmptyArrays: true
+        }
+      },
       {
         $project: {
           title: 1,
           url: 1,
           created_at: 1,
-          creator_name: "$creator.username",
+          creator_name: { $ifNull: ["$creator.username", "NĐT ẩn danh"] },
           total_interactions: { $size: "$interactions" },
           is_completed: {
             $in: [currentUserId, "$interactions.user_id"]
@@ -46,6 +53,7 @@ router.get("/", async (req, res) => {
 
     res.json(tasks);
   } catch (err) {
+    console.error("Lỗi lấy danh sách task:", err);
     res.status(500).json({ error: "Không thể lấy danh sách nhiệm vụ." });
   }
 });
@@ -54,29 +62,31 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   if (!req.currentUser) return res.status(401).json({ error: "Chưa đăng nhập." });
 
-  // Kiểm tra điểm người dùng
-  const user = await User.findById(req.currentUser._id);
-  if (user.points < 10) {
-    return res.status(400).json({
-      error: "Bạn cần tối thiểu 10 điểm để đăng 1 link. Hãy tương tác link của người khác để kiếm thêm điểm!"
-    });
-  }
-
   const { title, url } = req.body;
   if (!title || !url) {
     return res.status(400).json({ error: "Vui lòng nhập đầy đủ tiêu đề và link." });
   }
 
-  // Dùng MongoDB Transaction để đảm bảo tính an toàn dữ liệu
+  // Dùng Session Transaction để đảm bảo an toàn điểm số và tạo task
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    // Trừ 10 điểm
+    const user = await User.findById(req.currentUser._id).session(session);
+
+    if (!user || user.points < 10) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        error: "Bạn cần tối thiểu 10 điểm để đăng 1 link. Hãy tương tác link của người khác để kiếm thêm điểm!"
+      });
+    }
+
+    // Trừ 10 điểm của user
     user.points -= 10;
     await user.save({ session });
 
-    // Tạo Task
+    // Tạo Task mới
     const newTask = new Task({
       user_id: user._id,
       title,
@@ -87,10 +97,15 @@ router.post("/", async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    res.json({ success: true, taskId: newTask._id, message: "Đã trừ 10 điểm và đăng link thành công!" });
+    res.json({
+      success: true,
+      taskId: newTask._id,
+      message: "Đã trừ 10 điểm và đăng link thành công!"
+    });
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
+    console.error("Lỗi đăng link:", err);
     res.status(500).json({ error: "Không thể đăng link." });
   }
 });
@@ -102,25 +117,64 @@ router.post("/:id/complete", async (req, res) => {
   const taskId = req.params.id;
   const userId = req.currentUser._id;
 
+  // Kiểm tra tính hợp lệ của Task ID
+  if (!mongoose.Types.ObjectId.isValid(taskId)) {
+    return res.status(400).json({ error: "Mã nhiệm vụ không hợp lệ." });
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    // Kiểm tra số lượt tương tác hiện tại
-    const interactionCount = await CrossLog.countDocuments({ task_id: taskId });
+    // 1. Kiểm tra task có tồn tại không
+    const task = await Task.findById(taskId).session(session);
+    if (!task) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: "Nhiệm vụ không tồn tại." });
+    }
+
+    // Không cho phép tự làm nhiệm vụ của chính mình
+    if (task.user_id.toString() === userId.toString()) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: "Bạn không thể tự tương tác link của chính mình!" });
+    }
+
+    // 2. Kiểm tra số lượt tương tác hiện tại
+    const interactionCount = await CrossLog.countDocuments({ task_id: taskId }).session(session);
     if (interactionCount >= 10) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ error: "Link này đã đạt tối đa 10 lượt tương tác." });
     }
 
-    // Kiểm tra xem user này đã click link này chưa
-    const existingLog = await CrossLog.findOne({ user_id: userId, task_id: taskId });
+    // 3. Kiểm tra xem user này đã click link này chưa
+    const existingLog = await CrossLog.findOne({ user_id: userId, task_id: taskId }).session(session);
     if (existingLog) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ error: "Bạn đã tương tác với link này rồi!" });
     }
 
-    // Thực hiện cộng điểm và ghi log
-    await CrossLog.create({ user_id: userId, task_id: taskId });
-    await User.findByIdAndUpdate(userId, { $inc: { points: 1 } });
+    // 4. Tạo Log tương tác & Cộng +1 điểm cho User
+    await CrossLog.create([{ user_id: userId, task_id: taskId }], { session });
+    await User.findByIdAndUpdate(userId, { $inc: { points: 1 } }, { session });
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.json({ success: true, message: "Tương tác thành công! Bạn nhận được +1 điểm." });
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+
+    // Bắt lỗi trùng lặp nếu bấm nhanh 2 lần liên tiếp (E11000 duplicate key error)
+    if (err.code === 11000) {
+      return res.status(400).json({ error: "Bạn đã tương tác với link này rồi!" });
+    }
+
+    console.error("Lỗi hoàn thành nhiệm vụ:", err);
     res.status(500).json({ error: "Lỗi xử lý tương tác." });
   }
 });
@@ -132,6 +186,10 @@ router.post("/:id/report", async (req, res) => {
   const taskId = req.params.id;
   const { reason } = req.body;
 
+  if (!mongoose.Types.ObjectId.isValid(taskId)) {
+    return res.status(400).json({ error: "Mã nhiệm vụ không hợp lệ." });
+  }
+
   try {
     await Report.create({
       reporter_id: req.currentUser._id,
@@ -141,6 +199,7 @@ router.post("/:id/report", async (req, res) => {
 
     res.json({ success: true, message: "Đã gửi báo cáo tới Admin xem xét." });
   } catch (err) {
+    console.error("Lỗi báo cáo vi phạm:", err);
     res.status(500).json({ error: "Không thể gửi báo cáo." });
   }
 });
