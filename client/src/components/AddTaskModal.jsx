@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { X, FileText, Link2, PlusCircle, Loader2, AlertCircle } from "lucide-react";
 
 export default function AddTaskModal({ onClose, onCreate }) {
   const [title, setTitle] = useState("");
@@ -22,23 +21,23 @@ export default function AddTaskModal({ onClose, onCreate }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-ink/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-ink/10 transition-all scale-100">
+    <div className="fixed inset-0 bg-ink/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-ink/10 transition-all">
         
         {/* Header Modal */}
         <div className="flex items-center justify-between pb-3 mb-4 border-b border-ink/5">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-mint/10 text-mint flex items-center justify-center">
-              <PlusCircle className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-xl bg-mint/10 text-mint flex items-center justify-center font-bold">
+              ➕
             </div>
             <h3 className="font-bold text-ink text-base">Thêm nhiệm vụ mới</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-xl text-ink/40 hover:bg-slate-100 hover:text-ink transition-all"
+            className="w-8 h-8 rounded-xl text-ink/40 hover:bg-slate-100 hover:text-ink transition-all flex items-center justify-center font-bold"
           >
-            <X className="w-4 h-4" />
+            ✕
           </button>
         </div>
 
@@ -50,7 +49,7 @@ export default function AddTaskModal({ onClose, onCreate }) {
               Tiêu đề nhiệm vụ
             </label>
             <div className="relative">
-              <FileText className="w-4 h-4 text-ink/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm opacity-50">📝</span>
               <input
                 type="text"
                 className="w-full bg-slate-50 border border-ink/10 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-ink placeholder:text-ink/30 focus:outline-none focus:bg-white focus:border-mint focus:ring-2 focus:ring-mint/20 transition-all"
@@ -68,7 +67,7 @@ export default function AddTaskModal({ onClose, onCreate }) {
               Link cần chéo
             </label>
             <div className="relative">
-              <Link2 className="w-4 h-4 text-ink/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm opacity-50">🔗</span>
               <input
                 type="url"
                 className="w-full bg-slate-50 border border-ink/10 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-ink placeholder:text-ink/30 focus:outline-none focus:bg-white focus:border-mint focus:ring-2 focus:ring-mint/20 transition-all"
@@ -83,7 +82,7 @@ export default function AddTaskModal({ onClose, onCreate }) {
           {/* Alert Error */}
           {error && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-100 text-red-600 text-xs">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>⚠️</span>
               <span>{error}</span>
             </div>
           )}
@@ -102,14 +101,8 @@ export default function AddTaskModal({ onClose, onCreate }) {
               disabled={loading}
               className="flex-1 bg-ink text-white font-medium rounded-xl py-2.5 text-sm hover:bg-ink/90 active:scale-[0.98] disabled:opacity-50 transition-all shadow-md shadow-ink/10 flex items-center justify-center gap-1.5"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Đang lưu...
-                </>
-              ) : (
-                "Lưu"
-              )}
+              {loading && <span className="animate-spin">⌛</span>}
+              <span>{loading ? "Đang lưu..." : "Lưu"}</span>
             </button>
           </div>
         </form>
