@@ -7,17 +7,17 @@
     "node": "20.x"
   },
   "scripts": {
-    "install:server": "npm install",
-    "install:client": "cd client && npm install",
-    "build": "npm run install:server && npm run install:client && cd client && npm run build",
+    "install:client": "npm install --prefix client",
+    "build": "npm run install:client && npm run build --prefix client",
     "start": "node server/index.js",
     "dev:server": "node server/index.js",
-    "dev:client": "cd client && npm run dev"
+    "dev:client": "npm run dev --prefix client"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
+    "mongoose": "^8.3.0",
     "node-cron": "^3.0.3"
   }
 }
