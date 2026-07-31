@@ -1,32 +1,29 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../db");
+const { Task, CrossLog } = require("../models/Schemas");
 
 // DELETE /api/cron/clear-all-tasks
-router.delete("/clear-all-tasks", (req, res) => {
+router.delete("/clear-all-tasks", async (req, res) => {
   const cronSecret = req.headers["x-cron-secret"] || req.query.secret;
 
-  // Xác thực bí mật nếu môi trường có cài đặt CRON_SECRET
   if (process.env.CRON_SECRET && cronSecret !== process.env.CRON_SECRET) {
     return res.status(403).json({ error: "Unauthorized: Mã xác thực Cron không hợp lệ" });
   }
 
   try {
-    // 1. Xóa lịch sử làm nhiệm vụ (cross_logs) để ngày mới mọi người có thể chéo lại từ đầu
-    const deleteLogs = db.prepare("DELETE FROM cross_logs");
-    const logsResult = deleteLogs.run();
+    // 1. Xóa lịch sử làm nhiệm vụ (CrossLog)
+    const logDeleteResult = await CrossLog.deleteMany({});
 
-    // 2. Xóa toàn bộ danh sách nhiệm vụ (tasks) hiện tại
-    const deleteTasks = db.prepare("DELETE FROM tasks");
-    const tasksResult = deleteTasks.run();
+    // 2. Xóa toàn bộ danh sách nhiệm vụ (Task)
+    const taskDeleteResult = await Task.deleteMany({});
 
-    console.log(`[CRON API SUCCESS] Đã xóa ${logsResult.changes} logs và ${tasksResult.changes} tasks.`);
+    console.log(`[CRON SUCCESS] Đã xóa ${logDeleteResult.deletedCount} logs và ${taskDeleteResult.deletedCount} tasks.`);
 
     return res.json({
       success: true,
       message: "Hoàn tất dọn dẹp dữ liệu ngày mới!",
-      deletedLogs: logsResult.changes,
-      deletedTasks: tasksResult.changes,
+      deletedLogs: logDeleteResult.deletedCount,
+      deletedTasks: taskDeleteResult.deletedCount
     });
   } catch (error) {
     console.error("Lỗi xảy ra khi dọn dẹp nhiệm vụ qua API Cron:", error);
