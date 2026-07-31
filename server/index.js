@@ -1,19 +1,20 @@
 /**
  * server/index.js
- * Diem khoi dong Backend. Serve luon file tinh cua Client (client/dist)
- * de toan bo app chay tren DUY NHAT 1 Render Web Service.
+ * Điểm khởi động Backend. Serve luôn file tĩnh của Client (client/dist)
+ * để toàn bộ app chạy trên DUY NHẤT 1 Render Web Service.
  */
 const path = require("path");
 const express = require("express");
 const cors = require("cors");
-const cron = require("node-cron"); // Đã import thêm node-cron
+const cron = require("node-cron");
 const db = require("./db");
 
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
 const taskRoutes = require("./routes/tasks");
 const logRoutes = require("./routes/logs");
-const adminRoutes = require("./routes/admin"); // 1. IMPORT THÊM ROUTE ADMIN
+const adminRoutes = require("./routes/admin");
+const cronRoutes = require("./routes/cron"); // <-- IMPORT ROUTE CRON MỚI
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -21,7 +22,7 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// ---- Middleware xac thuc: doc Bearer token, gan req.currentUser neu hop le ----
+// ---- Middleware xác thực: đọc Bearer token, gán req.currentUser nếu hợp lệ ----
 app.use((req, res, next) => {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
@@ -41,21 +42,20 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/logs", logRoutes);
-app.use("/admin", adminRoutes); // 2. KÍCH HOẠT ĐỊA CHỈ /admin TẠI ĐÂY
+app.use("/admin", adminRoutes);
+app.use("/api/cron", cronRoutes); // <-- ĐĂNG KÝ ROUTE CRON TẠI ĐÂY
 
 app.get("/api/health", (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
-// ---- Tự động dọn dẹp nhiệm vụ lúc 0:00 hàng ngày (Giờ Việt Nam) ----
+// ---- Tự động dọn dẹp nhiệm vụ lúc 0:00 hàng ngày (Dự phòng nội bộ) ----
 cron.schedule("0 0 * * *", () => {
   console.log(`[${new Date().toISOString()}] Bắt đầu tự động dọn dẹp dữ liệu nhiệm vụ hàng ngày...`);
   
   try {
-    // 1. Xóa lịch sử làm nhiệm vụ (cross_logs) để ngày mới mọi người có thể chéo lại từ đầu
     const deleteLogs = db.prepare("DELETE FROM cross_logs");
     const logsResult = deleteLogs.run();
     console.log(`- Đã xóa ${logsResult.changes} bản ghi trong bảng cross_logs.`);
 
-    // 2. Xóa toàn bộ danh sách nhiệm vụ (tasks) hiện tại
     const deleteTasks = db.prepare("DELETE FROM tasks");
     const tasksResult = deleteTasks.run();
     console.log(`- Đã làm sạch ${tasksResult.changes} nhiệm vụ trong bảng tasks.`);
@@ -66,7 +66,7 @@ cron.schedule("0 0 * * *", () => {
   }
 }, {
   scheduled: true,
-  timezone: "Asia/Ho_Chi_Minh" // Ép chạy theo múi giờ Việt Nam độc lập với giờ của server Render
+  timezone: "Asia/Ho_Chi_Minh"
 });
 
 // ---- Serve React build (client/dist) ----
